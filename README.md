@@ -11,9 +11,18 @@ POST /items
 }
 ```
 
-### Search similar items
-GET /similar-items
+### Search similar skus
+GET /similar-skus
 ```?imageUrl=https://picsum.photos/1000.jpg```
+Response:
+```json
+{
+   "similarSkus": [{
+      "sku": "sku",
+      "score": 0.5
+   }]
+}
+```
 
 ## Run
 

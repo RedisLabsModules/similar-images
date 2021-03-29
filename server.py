@@ -10,6 +10,7 @@ app = Flask(__name__)
 redis_client = Redis()
 
 KEY_PREFIX = 'items:'
+VECTOR_PREFIX = 'vector:'
 
 
 @app.route('/items', methods=['POST'])
@@ -21,7 +22,7 @@ def create_item():
         return f'{request.json["sku"]} already exists', 400
 
     redis_client.execute_command('HSET', key, 'sku', request.json['sku'], 'imageUrl', request.json['imageUrl'])
-    redis_client.execute_command('RG.VEC_ADD', key, vector)
+    redis_client.execute_command('RG.VEC_ADD', KEY_PREFIX + VECTOR_PREFIX + request.json['sku'], vector)
 
     return ''
 
@@ -63,7 +64,14 @@ def load_model():
 
 def get_request_similar_skus():
     vector = image_url_to_vector(request.args['imageUrl'])
-    return redis_client.execute_command('RG.VEC_SIM', '5', vector)[0]
+    result = []
+    for sku in redis_client.execute_command('RG.VEC_SIM', '5', vector)[0]:
+        result.append({
+            'sku': sku[0].decode()[len(KEY_PREFIX) + len(VECTOR_PREFIX):],
+            'score': float(sku[1])
+        })
+
+    return result
 
 
 @app.route('/similar-skus', methods=['GET'])
@@ -75,14 +83,9 @@ def get_similar_skus():
 
 @app.route('/similar-items', methods=['GET'])
 def get_similar_items():
-    items = []
-    for sku in get_request_similar_skus():
-        data = redis_client.hmget(KEY_PREFIX + sku[0].decode(), 'sku', 'imageUrl')
-        items.append({
-            'sku': data[0].decode(),
-            'imageUrl': data[1].decode(),
-            'score': sku[1].decode()
-        })
+    items = get_request_similar_skus()
+    for item in items:
+        item['imageUrl'] = redis_client.hget(KEY_PREFIX + item['sku'], 'imageUrl').decode()
 
     return json.dumps({
         'similarItems': items
