@@ -1,3 +1,4 @@
 opencv-python
 redis
 numpy
+flask
